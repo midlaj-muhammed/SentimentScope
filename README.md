@@ -1,51 +1,104 @@
-# SentimentScope - Premium Sentiment Analysis Tool
+# 🎯 SentimentScope
 
-SentimentScope is a modern web application that performs advanced sentiment analysis using Natural Language Processing (NLP). The app allows users to analyze text, URLs, and hashtags to determine sentiment and visualize the results in an interactive and visually appealing manner.
+SentimentScope is a modern web application for analyzing sentiment across different sources - URLs, hashtags, and text. Built with Next.js, FastAPI, and TextBlob, it features a beautiful dark theme UI with glass morphism effects.
 
-## Features
+## ✨ Features
 
-- **Text Analysis**: Analyze sentiment in any text with our advanced NLP engine
-- **URL Analysis**: Extract and analyze sentiment from webpage content
-- **Hashtag Analysis**: Track sentiment across social media posts
-- **Interactive Visualizations**: View sentiment analysis results through beautiful charts and graphs
-- **Multi-Language Support**: Analyze content in multiple languages
-- **Modern UI**: Clean, responsive design with smooth animations
+- 🌐 **URL Analysis**: Extract and analyze sentiment from any webpage
+- 🔍 **Hashtag Analysis**: Track sentiment trends across social media
+- 📊 **Visual Analytics**: Beautiful charts and metrics using Recharts
+- 🎨 **Modern UI**: Sleek dark theme with glass morphism effects
+- ⚡ **Fast Processing**: Powered by FastAPI backend
+- 📱 **Responsive Design**: Works seamlessly on all devices
 
-## Tech Stack
-
-- **Frontend**: React + Next.js
-- **UI Library**: Tailwind CSS + ShadCN
-- **Backend**: FastAPI (Python)
-- **NLP**: TextBlob, NLTK
-- **Deployment**: Vercel
-
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+ and npm
 - Python 3.8+
-- npm or yarn
+- pip (Python package manager)
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/sentiment-scope.git
+   git clone https://github.com/midlaj-muhammed/SentimentScope.git
    cd sentiment-scope
    ```
 
 2. Install frontend dependencies:
    ```bash
    npm install
-   # or
-   yarn install
    ```
 
-3. Install Python dependencies:
+3. Install backend dependencies:
    ```bash
+   cd backend
    pip install -r requirements.txt
    ```
+
+### Running the Application
+
+1. Start the backend server:
+   ```bash
+   cd backend
+   uvicorn app:app --reload
+   ```
+
+2. In a new terminal, start the frontend:
+   ```bash
+   npm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Next.js** - React framework
+- **Tailwind CSS** - Styling
+- **Framer Motion** - Animations
+- **Recharts** - Data visualization
+
+### Backend
+- **FastAPI** - API framework
+- **TextBlob** - Natural Language Processing
+- **BeautifulSoup4** - Web scraping
+- **Python-Twitter** - Twitter API integration
+
+## 📦 Project Structure
+
+```
+sentiment-scope/
+├── app/                    # Next.js pages and components
+│   ├── analyze/           # Analysis pages (URL, hashtag)
+│   └── layout.tsx         # Root layout
+├── components/            # Reusable React components
+├── backend/              # FastAPI server
+│   ├── app.py            # Main API endpoints
+│   └── requirements.txt  # Python dependencies
+└── lib/                  # Utility functions
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👨‍💻 Author
+
+**Midlaj Muhammed**
+- GitHub: [@midlaj-muhammed](https://github.com/midlaj-muhammed)
+
+## 🙏 Acknowledgments
+
+- TextBlob for sentiment analysis
+- Next.js team for the amazing framework
+- The open source community
 
 ### Running the Application
 
