@@ -127,14 +127,6 @@ The backend API provides the following endpoints:
 
 For detailed API documentation, visit [http://localhost:8000/docs](http://localhost:8000/docs) when the backend server is running.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
@@ -149,4 +141,14 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# SentimentScope
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check issues page.
+
+## 📝 License
+
+This project is open source and available under the MIT License.
+
+---
+Created with ❤️ for IBM Project
