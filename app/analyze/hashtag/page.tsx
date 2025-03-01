@@ -21,7 +21,7 @@ export default function HashtagAnalysis() {
   }>(null);
 
   const handleHashtagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHashtag(e.target.value);
+    setHashtag(e.target.value.replace(/^#/, ''));
   };
 
   const handleAnalyze = async () => {
@@ -90,8 +90,9 @@ export default function HashtagAnalysis() {
                 type="text"
                 value={hashtag}
                 onChange={handleHashtagChange}
-                placeholder="   Enter hashtag (without #)"
+                placeholder="Enter hashtag (without #)"
                 className="h-14 bg-white/5 px-6 text-base backdrop-blur-sm"
+                autoComplete="off"
                 icon={
                   <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
@@ -138,15 +139,23 @@ export default function HashtagAnalysis() {
                     data={result.timeline}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <Tooltip />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="time" stroke="#999" />
+                    <YAxis yAxisId="left" stroke="#4F46E5" />
+                    <YAxis yAxisId="right" orientation="right" stroke="#10B981" />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: '#fff'
+                      }}
+                    />
                     <Line
                       yAxisId="left"
                       type="monotone"
                       dataKey="sentiment"
+                      name="Sentiment"
                       stroke="#4F46E5"
                       activeDot={{ r: 8 }}
                     />
@@ -154,6 +163,7 @@ export default function HashtagAnalysis() {
                       yAxisId="right"
                       type="monotone"
                       dataKey="volume"
+                      name="Volume"
                       stroke="#10B981"
                       activeDot={{ r: 8 }}
                     />
