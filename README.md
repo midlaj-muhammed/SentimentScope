@@ -2,7 +2,7 @@
 
 SentimentScope is a modern web application for analyzing sentiment across different sources - URLs, hashtags, and text. Built with Next.js, FastAPI, and TextBlob, it features a beautiful dark theme UI with glass morphism effects.
 
-🌐 **[Live Demo](https://idea-struct.vercel.app/)**
+🌐 **[Live Demo](https://sentiment-scope-ten.vercel.app/)**
 
 
 ## ✨ Features
