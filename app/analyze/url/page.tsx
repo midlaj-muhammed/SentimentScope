@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { cn } from '@/lib/utils';
 
 export default function URLAnalysis() {
   const [url, setUrl] = useState('');
@@ -15,7 +14,6 @@ export default function URLAnalysis() {
     confidence: number;
     wordFrequency: { word: string; count: number }[];
   }>(null);
-
 
   const handleAnalyze = async () => {
     if (!url.trim()) return;
@@ -93,11 +91,9 @@ export default function URLAnalysis() {
               <button
                 onClick={handleAnalyze}
                 disabled={!url.trim() || loading}
-                className={cn(
-                  "mt-4 w-full rounded-lg bg-purple-600 px-4 py-3 text-sm font-medium text-white transition-colors",
-                  "hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20",
-                  "disabled:cursor-not-allowed disabled:opacity-50"
-                )}
+                className={`mt-4 w-full rounded-lg bg-purple-600 px-4 py-3 text-sm font-medium text-white transition-colors
+                  hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20
+                  ${!url.trim() || loading ? 'cursor-not-allowed opacity-50' : ''}`}
               >
                 {loading ? 'Analyzing...' : 'Analyze URL'}
               </button>

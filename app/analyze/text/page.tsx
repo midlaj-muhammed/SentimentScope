@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 export default function TextAnalysis() {
   const [text, setText] = useState('');
@@ -20,7 +20,6 @@ export default function TextAnalysis() {
   const handleAnalyze = async () => {
     setLoading(true);
     try {
-      // TODO: Implement actual sentiment analysis API call
       const mockResult = {
         sentiment: 'positive' as const,
         score: 0.85,
@@ -38,7 +37,12 @@ export default function TextAnalysis() {
     }
   };
 
+  const pieData = [
+    { name: 'Positive', value: result?.score || 0 },
+    { name: 'Negative', value: result ? (1 - result.score) : 0 }
+  ];
 
+  const pieColors = ['#4CAF50', '#f44336'];
 
   return (
     <div className="container mx-auto px-4 pt-24">
@@ -132,10 +136,7 @@ export default function TextAnalysis() {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={[
-                              { name: 'Positive', value: result.pos },
-                              { name: 'Negative', value: result.neg }
-                            ]}
+                            data={pieData}
                             cx="50%"
                             cy="50%"
                             innerRadius={50}
@@ -143,36 +144,14 @@ export default function TextAnalysis() {
                             paddingAngle={5}
                             dataKey="value"
                           >
-                            {[
-                              { color: '#4CAF50', name: 'Positive' },
-                              { color: '#f44336', name: 'Negative' }
-                            ].map((entry, index) => (
+                            {pieData.map((entry, index) => (
                               <Cell 
                                 key={`cell-${index}`} 
-                                fill={entry.color}
+                                fill={pieColors[index]}
                                 className="stroke-background stroke-2"
                               />
                             ))}
                           </Pie>
-                          <Legend 
-                            verticalAlign="bottom"
-                            height={36}
-                            content={({ payload }) => (
-                              <div className="flex justify-center gap-4">
-                                {payload?.map((entry, index) => (
-                                  <div key={`legend-${index}`} className="flex items-center">
-                                    <div 
-                                      className="mr-2 h-3 w-3 rounded-full" 
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                    <span className="text-sm text-gray-400">
-                                      {entry.value}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
