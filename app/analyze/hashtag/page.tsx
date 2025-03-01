@@ -90,7 +90,7 @@ export default function HashtagAnalysis() {
                 type="text"
                 value={hashtag}
                 onChange={handleHashtagChange}
-                placeholder="Enter hashtag (without #)"
+                placeholder="  Enter hashtag (without #)"
                 className="h-14 bg-white/5 px-6 text-base backdrop-blur-sm"
                 autoComplete="off"
                 icon={
