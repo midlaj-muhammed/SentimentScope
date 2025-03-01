@@ -10,6 +10,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from datetime import datetime, timedelta
 import random  # For demo data
+import os
 
 # Download required NLTK data
 try:
@@ -21,10 +22,13 @@ except LookupError:
 
 app = Flask(__name__)
 
-# Configure CORS to allow all origins
+# Get allowed origins from environment variable or default to all
+ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*')
+
+# Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": "*",
+        "origins": ALLOWED_ORIGINS.split(','),
         "methods": ["OPTIONS", "POST", "GET"],
         "allow_headers": ["Content-Type"]
     }
@@ -229,4 +233,7 @@ def analyze_hashtag():
         return jsonify({"error": f"Error analyzing hashtag: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    host = os.environ.get('HOST', '0.0.0.0')
+    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    app.run(host=host, port=port, debug=debug)

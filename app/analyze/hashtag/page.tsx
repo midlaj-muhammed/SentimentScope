@@ -6,6 +6,9 @@ import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 
+// Get the API URL from environment variable or fallback to localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function HashtagAnalysis() {
   const [hashtag, setHashtag] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,16 +33,20 @@ export default function HashtagAnalysis() {
     setLoading(true);
     try {
       const cleanHashtag = hashtag.trim().replace(/^#/, '');
-      const response = await fetch('http://localhost:8000/analyze/hashtag', {
+      const response = await fetch(`${API_URL}/analyze/hashtag`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ hashtag: cleanHashtag }),
+        mode: 'cors',
+        credentials: 'omit'
       });
       
       if (!response.ok) {
-        throw new Error('Failed to analyze hashtag');
+        const errorText = await response.text();
+        throw new Error(`Failed to analyze hashtag: ${errorText}`);
       }
       
       const data = await response.json();
@@ -49,9 +56,10 @@ export default function HashtagAnalysis() {
         confidence: data.confidence,
         timeline: data.timeline
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error analyzing hashtag:', error);
-      alert('Failed to analyze hashtag. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to analyze hashtag. Please check if the API is accessible at ${API_URL}\n\nError: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
