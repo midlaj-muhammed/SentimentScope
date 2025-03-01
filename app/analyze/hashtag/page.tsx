@@ -17,6 +17,15 @@ export default function HashtagAnalysis() {
     sentiment: 'positive' | 'negative' | 'neutral';
     score: number;
     confidence: number;
+    details: {
+      vader_scores: {
+        pos: number;
+        neu: number;
+        neg: number;
+        compound: number;
+      };
+      textblob_score: number;
+    };
     timeline: {
       time: string;
       sentiment: number;
@@ -53,11 +62,16 @@ export default function HashtagAnalysis() {
       }
       
       const data = await response.json();
+      console.log('API Response:', data);
       setResult({
         sentiment: data.sentiment,
         score: data.score,
         confidence: data.confidence,
-        timeline: data.timeline
+        details: {
+          vader_scores: data.details.vader_scores,
+          textblob_score: data.details.textblob_score
+        },
+        timeline: data.timeline || []
       });
     } catch (error: unknown) {
       console.error('Error analyzing hashtag:', error);
@@ -140,17 +154,83 @@ export default function HashtagAnalysis() {
             className="mt-12"
           >
             <div className="rounded-2xl border border-white/10 bg-black/20 p-8 backdrop-blur-xl">
-              <h3 className="text-2xl font-bold mb-4">Analysis Results</h3>
+              <h3 className="text-2xl font-bold mb-4">Text Analysis</h3>
+              
+              {/* Sentiment Score */}
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-300">Sentiment Score</h4>
+                <p className="text-3xl font-bold">{result.score.toFixed(2)}</p>
+                <p className="text-sm text-gray-400">Overall sentiment intensity</p>
+              </div>
+
+              {/* Detailed Analysis */}
               <div className="space-y-4">
-                <div>
-                  <p className="text-gray-400">Overall Sentiment</p>
-                  <p className="text-2xl font-bold capitalize">{result.sentiment}</p>
+                <h4 className="text-lg font-semibold text-gray-300">Detailed Analysis</h4>
+                
+                {/* Positive Score */}
+                <div className="relative pt-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold inline-block text-green-400">
+                        Positive Score
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold inline-block text-green-400">
+                        {(result.details.vader_scores.pos * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-green-400/20">
+                    <div style={{ width: `${result.details.vader_scores.pos * 100}%` }}
+                         className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-400">
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-gray-400">Confidence Score</p>
-                  <p className="text-2xl font-bold">{(result.confidence * 100).toFixed(1)}%</p>
+
+                {/* Neutral Score */}
+                <div className="relative pt-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold inline-block text-blue-400">
+                        Neutral Score
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold inline-block text-blue-400">
+                        {(result.details.vader_scores.neu * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-400/20">
+                    <div style={{ width: `${result.details.vader_scores.neu * 100}%` }}
+                         className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-400">
+                    </div>
+                  </div>
+                </div>
+
+                {/* Negative Score */}
+                <div className="relative pt-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold inline-block text-red-400">
+                        Negative Score
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold inline-block text-red-400">
+                        {(result.details.vader_scores.neg * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-red-400/20">
+                    <div style={{ width: `${result.details.vader_scores.neg * 100}%` }}
+                         className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-red-400">
+                    </div>
+                  </div>
                 </div>
               </div>
+
               <div className="h-64 mt-8">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart

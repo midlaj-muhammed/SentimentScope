@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
+// Get the API URL from environment variable or fallback to production URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
@@ -11,25 +14,37 @@ export default function TextAnalysis() {
     sentiment: 'positive' | 'negative' | 'neutral';
     score: number;
     confidence: number;
-    compound_score: number;
-    pos: number;
-    neu: number;
-    neg: number;
+    details: {
+      vader_scores: {
+        pos: number;
+        neu: number;
+        neg: number;
+        compound: number;
+      };
+      textblob_score: number;
+    };
   }>(null);
 
   const handleAnalyze = async () => {
+    if (!text.trim()) return;
+    
     setLoading(true);
     try {
-      const mockResult = {
-        sentiment: 'positive' as const,
-        score: 0.85,
-        confidence: 0.92,
-        compound_score: 0.75,
-        pos: 0.6,
-        neu: 0.3,
-        neg: 0.1
-      };
-      setResult(mockResult);
+      const response = await fetch(`${API_URL}/analyze/text`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API Response:', data);
+      setResult(data);
     } catch (error) {
       console.error('Error analyzing text:', error);
     } finally {
@@ -37,12 +52,13 @@ export default function TextAnalysis() {
     }
   };
 
-  const pieData = [
-    { name: 'Positive', value: result?.score || 0 },
-    { name: 'Negative', value: result ? (1 - result.score) : 0 }
-  ];
+  const pieData = result ? [
+    { name: 'Positive', value: result.details.vader_scores.pos },
+    { name: 'Neutral', value: result.details.vader_scores.neu },
+    { name: 'Negative', value: result.details.vader_scores.neg }
+  ] : [];
 
-  const pieColors = ['#4CAF50', '#f44336'];
+  const pieColors = ['#4CAF50', '#9e9e9e', '#f44336'];
 
   return (
     <div className="container mx-auto px-4 pt-24">
@@ -119,14 +135,15 @@ export default function TextAnalysis() {
                         </svg>
                       </div>
                     </div>
-                    <h3 className="mb-4 text-lg font-medium text-white">Sentiment Score</h3>
-                    <div className="mt-2">
-                      <div className="text-3xl font-bold text-white">
-                        {result.compound_score.toFixed(2)}
+                    <h3 className="mb-4 text-lg font-medium text-white">Overall Sentiment</h3>
+                    <div className="mt-2 space-y-4">
+                      <div className={`text-3xl font-bold ${result.sentiment === 'positive' ? 'text-green-400' : result.sentiment === 'negative' ? 'text-red-400' : 'text-blue-400'}`}>
+                        {result.sentiment.toUpperCase()}
                       </div>
-                      <p className="mt-2 text-sm text-gray-400">
-                        Overall sentiment intensity
-                      </p>
+                      <div>
+                        <p className="text-sm text-gray-400 mb-1">Sentiment Score</p>
+                        <p className="text-2xl font-semibold text-white">{result.score.toFixed(2)}</p>
+                      </div>
                     </div>
                   </div>
 
@@ -162,9 +179,9 @@ export default function TextAnalysis() {
                     <h3 className="mb-4 text-lg font-medium text-white">Detailed Analysis</h3>
                     <div className="grid gap-4 md:grid-cols-3">
                       {[
-                        { label: 'Positive Score', value: result.pos, color: '#4CAF50' },
-                        { label: 'Neutral Score', value: result.neu, color: '#9e9e9e' },
-                        { label: 'Negative Score', value: result.neg, color: '#f44336' }
+                        { label: 'Positive Score', value: result.details.vader_scores.pos, color: '#4CAF50' },
+                        { label: 'Neutral Score', value: result.details.vader_scores.neu, color: '#9e9e9e' },
+                        { label: 'Negative Score', value: result.details.vader_scores.neg, color: '#f44336' }
                       ].map((score, index) => (
                         <div key={index} className="relative">
                           <div className="mb-2 text-sm text-gray-400">{score.label}</div>

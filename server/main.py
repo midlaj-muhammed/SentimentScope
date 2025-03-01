@@ -181,6 +181,59 @@ def analyze_url():
         print(f"Error analyzing content: {str(e)}")
         return jsonify({"error": f"Error analyzing content: {str(e)}"}), 500
 
+@app.route('/analyze/text', methods=['POST', 'OPTIONS'])
+def analyze_text():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        print("Received text analysis request:", request.get_json())
+        data = request.get_json()
+        
+        if not data:
+            print("No JSON data received")
+            return jsonify({"error": "No JSON data received"}), 400
+            
+        text = data.get('text')
+        
+        if not text:
+            print("Text is required")
+            return jsonify({"error": "Text is required"}), 400
+            
+        print(f"Analyzing text: {text}")
+
+        # Clean the text
+        cleaned_text = clean_text(text)
+        
+        # Get sentiment analysis
+        sentiment_analysis = analyze_sentiment(cleaned_text)
+        
+        # Calculate overall sentiment
+        score = sentiment_analysis['score']
+        if score > 0.1:
+            sentiment = "positive"
+        elif score < -0.1:
+            sentiment = "negative"
+        else:
+            sentiment = "neutral"
+            
+        result = {
+            "sentiment": sentiment,
+            "score": score,
+            "confidence": sentiment_analysis['confidence'],
+            "details": {
+                "vader_scores": sentiment_analysis['vader_scores'],
+                "textblob_score": sentiment_analysis['textblob_score']
+            }
+        }
+        
+        print("Text analysis result:", result)
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Error analyzing text: {str(e)}")
+        return jsonify({"error": f"Error analyzing text: {str(e)}"}), 500
+
 @app.route('/analyze/hashtag', methods=['POST', 'OPTIONS'])
 def analyze_hashtag():
     if request.method == 'OPTIONS':
