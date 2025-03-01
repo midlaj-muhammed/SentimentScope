@@ -8,6 +8,7 @@ import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from datetime import datetime, timedelta
 import random
 import os
@@ -16,9 +17,11 @@ import os
 try:
     nltk.data.find('tokenizers/punkt')
     nltk.data.find('corpora/stopwords')
+    nltk.data.find('sentiment/vader_lexicon')
 except LookupError:
     nltk.download('punkt')
     nltk.download('stopwords')
+    nltk.download('vader_lexicon')
 
 app = Flask(__name__)
 
@@ -49,8 +52,10 @@ def after_request(response):
 def clean_text(text):
     # Remove HTML tags
     text = re.sub(r'<[^>]+>', '', text)
+    # Remove URLs
+    text = re.sub(r'http\S+|www.\S+', '', text)
     # Remove special characters and digits
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
     # Convert to lowercase
     text = text.lower()
     return text
@@ -65,26 +70,61 @@ def get_word_frequency(text, top_n=10):
     word_freq = Counter(tokens).most_common(top_n)
     return [{"word": word, "count": count} for word, count in word_freq]
 
+def analyze_sentiment(text):
+    # Initialize VADER sentiment analyzer
+    sia = SentimentIntensityAnalyzer()
+    
+    # Get VADER sentiment scores
+    vader_scores = sia.polarity_scores(text)
+    
+    # Get TextBlob sentiment
+    blob = TextBlob(text)
+    textblob_sentiment = blob.sentiment.polarity
+    
+    # Combine VADER and TextBlob scores with weights
+    # VADER is better for social media text, so we give it more weight
+    compound_score = vader_scores['compound'] * 0.7 + textblob_sentiment * 0.3
+    
+    # Normalize to range [-1, 1]
+    normalized_score = max(min(compound_score, 1.0), -1.0)
+    
+    # Calculate confidence based on:
+    # 1. Agreement between VADER and TextBlob
+    # 2. VADER's compound score magnitude
+    # 3. TextBlob's subjectivity
+    score_agreement = 1 - abs(vader_scores['compound'] - textblob_sentiment) / 2
+    magnitude_confidence = abs(vader_scores['compound'])
+    subjectivity_confidence = blob.sentiment.subjectivity
+    
+    confidence = (score_agreement * 0.4 + magnitude_confidence * 0.4 + subjectivity_confidence * 0.2)
+    
+    return {
+        'score': normalized_score,
+        'confidence': confidence,
+        'vader_scores': vader_scores,
+        'textblob_score': textblob_sentiment
+    }
+
 @app.route('/analyze/url', methods=['POST', 'OPTIONS'])
 def analyze_url():
     if request.method == 'OPTIONS':
         return '', 200
         
     try:
-        print("Received request:", request.get_json())  # Debug logging
+        print("Received request:", request.get_json())
         data = request.get_json()
         
         if not data:
-            print("No JSON data received")  # Debug logging
+            print("No JSON data received")
             return jsonify({"error": "No JSON data received"}), 400
             
         url = data.get('url')
         
         if not url:
-            print("URL is required")  # Debug logging
+            print("URL is required")
             return jsonify({"error": "URL is required"}), 400
             
-        print(f"Analyzing URL: {url}")  # Debug logging
+        print(f"Analyzing URL: {url}")
             
         # Fetch URL content
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
@@ -99,44 +139,46 @@ def analyze_url():
         text = ' '.join([p.get_text() for p in paragraphs])
         
         if not text.strip():
-            print("No text content found")  # Debug logging
+            print("No text content found")
             return jsonify({"error": "No text content found in the URL"}), 400
         
         # Clean text
         cleaned_text = clean_text(text)
         
-        # Perform sentiment analysis
-        blob = TextBlob(cleaned_text)
-        sentiment_score = blob.sentiment.polarity
+        # Analyze sentiment
+        sentiment_analysis = analyze_sentiment(cleaned_text)
         
-        # Determine sentiment
-        if sentiment_score > 0.1:
+        # Determine sentiment label
+        score = sentiment_analysis['score']
+        if score > 0.1:
             sentiment = "positive"
-        elif sentiment_score < -0.1:
+        elif score < -0.1:
             sentiment = "negative"
         else:
             sentiment = "neutral"
             
-        # Calculate confidence (normalize subjectivity)
-        confidence = blob.sentiment.subjectivity
-        
         # Get word frequency
         word_frequency = get_word_frequency(cleaned_text)
         
         result = {
             "sentiment": sentiment,
-            "score": sentiment_score,
-            "confidence": confidence,
-            "wordFrequency": word_frequency
+            "score": sentiment_analysis['score'],
+            "confidence": sentiment_analysis['confidence'],
+            "wordFrequency": word_frequency,
+            "details": {
+                "vader_scores": sentiment_analysis['vader_scores'],
+                "textblob_score": sentiment_analysis['textblob_score']
+            }
         }
-        print("Analysis result:", result)  # Debug logging
+        
+        print("Analysis result:", result)
         return jsonify(result)
         
     except requests.RequestException as e:
-        print(f"Error fetching URL: {str(e)}")  # Debug logging
+        print(f"Error fetching URL: {str(e)}")
         return jsonify({"error": f"Error fetching URL: {str(e)}"}), 400
     except Exception as e:
-        print(f"Error analyzing content: {str(e)}")  # Debug logging
+        print(f"Error analyzing content: {str(e)}")
         return jsonify({"error": f"Error analyzing content: {str(e)}"}), 500
 
 @app.route('/analyze/hashtag', methods=['POST', 'OPTIONS'])
@@ -145,47 +187,50 @@ def analyze_hashtag():
         return '', 200
         
     try:
-        print("Received hashtag request:", request.get_json())  # Debug logging
+        print("Received hashtag request:", request.get_json())
         data = request.get_json()
         
         if not data:
-            print("No JSON data received")  # Debug logging
+            print("No JSON data received")
             return jsonify({"error": "No JSON data received"}), 400
             
         hashtag = data.get('hashtag')
         
         if not hashtag:
-            print("Hashtag is required")  # Debug logging
+            print("Hashtag is required")
             return jsonify({"error": "Hashtag is required"}), 400
             
-        print(f"Analyzing hashtag: {hashtag}")  # Debug logging
+        print(f"Analyzing hashtag: {hashtag}")
 
-        # Analyze the hashtag text itself for base sentiment
+        # Analyze the hashtag text itself
         hashtag_words = re.findall(r'[A-Z]?[a-z]+|[A-Z]{2,}(?=[A-Z][a-z]|\d|\W|$)|\d+', hashtag)
         hashtag_text = ' '.join(hashtag_words).lower()
-        base_sentiment = TextBlob(hashtag_text).sentiment.polarity
+        
+        # Get sentiment analysis
+        sentiment_analysis = analyze_sentiment(hashtag_text)
+        base_sentiment = sentiment_analysis['score']
 
         # Use hashtag as seed for random number generation to ensure consistency
         random.seed(hashtag)
 
         # Generate timeline data
-        now = datetime.now().replace(minute=0, second=0, microsecond=0)  # Round to nearest hour
+        now = datetime.now().replace(minute=0, second=0, microsecond=0)
         timeline = []
         
         # Base parameters - use hash of hashtag for consistency
         hashtag_hash = hash(hashtag)
-        base_volume = 100 + abs(hashtag_hash % 900)  # Range: 100-1000
+        base_volume = 100 + abs(hashtag_hash % 900)
         trend_direction = 1 if hashtag_hash % 2 == 0 else -1
         
-        for i in range(24):  # Last 24 hours
+        for i in range(24):
             hour = (now - timedelta(hours=23-i)).hour
-            time = f"{hour:02d}:00"  # Use 24-hour format for consistency
+            time = f"{hour:02d}:00"
             
             # Time-based volume adjustments
             time_factor = 1.0
-            if 9 <= hour <= 22:  # Daytime hours
+            if 9 <= hour <= 22:
                 time_factor = 1.5
-            elif 23 <= hour or hour <= 4:  # Late night
+            elif 23 <= hour or hour <= 4:
                 time_factor = 0.5
                 
             # Use deterministic values based on hashtag and hour
@@ -205,7 +250,7 @@ def analyze_hashtag():
             
             timeline.append({
                 "time": time,
-                "sentiment": round(sentiment, 3),  # Round for consistency
+                "sentiment": round(sentiment, 3),
                 "volume": volume
             })
             
@@ -225,23 +270,27 @@ def analyze_hashtag():
         sentiment_std = (sum((t["sentiment"] - weighted_sentiment) ** 2 for t in timeline) / len(timeline)) ** 0.5
         volume_factor = min(1.0, total_volume / (1000 * 24))
         consistency_factor = 1 - sentiment_std
-        confidence = round((volume_factor + consistency_factor) / 2, 3)  # Round for consistency
+        confidence = round((volume_factor + consistency_factor) / 2, 3)
             
         result = {
             "sentiment": sentiment,
-            "score": round(weighted_sentiment, 3),  # Round for consistency
+            "score": round(weighted_sentiment, 3),
             "confidence": confidence,
-            "timeline": timeline
+            "timeline": timeline,
+            "details": {
+                "vader_scores": sentiment_analysis['vader_scores'],
+                "textblob_score": sentiment_analysis['textblob_score']
+            }
         }
         
         # Reset random seed
         random.seed()
         
-        print("Hashtag analysis result:", result)  # Debug logging
+        print("Hashtag analysis result:", result)
         return jsonify(result)
         
     except Exception as e:
-        print(f"Error analyzing hashtag: {str(e)}")  # Debug logging
+        print(f"Error analyzing hashtag: {str(e)}")
         return jsonify({"error": f"Error analyzing hashtag: {str(e)}"}), 500
 
 if __name__ == "__main__":
