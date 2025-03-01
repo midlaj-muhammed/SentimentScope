@@ -9,7 +9,7 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from datetime import datetime, timedelta
-import random  # For demo data
+import random
 import os
 
 # Download required NLTK data
@@ -22,17 +22,29 @@ except LookupError:
 
 app = Flask(__name__)
 
-# Get allowed origins from environment variable or default to all
-ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*')
-
-# Configure CORS
+# Configure CORS to allow specific origins
 CORS(app, resources={
     r"/*": {
-        "origins": ALLOWED_ORIGINS.split(','),
-        "methods": ["OPTIONS", "POST", "GET"],
-        "allow_headers": ["Content-Type"]
+        "origins": [
+            "http://localhost:3000",
+            "https://sentiment-scope-ten.vercel.app",
+            "https://sentiment-scope.vercel.app",
+            "https://sentimentscope.vercel.app"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Range", "X-Content-Range"],
+        "supports_credentials": False,
+        "max_age": 120
     }
 })
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 def clean_text(text):
     # Remove HTML tags

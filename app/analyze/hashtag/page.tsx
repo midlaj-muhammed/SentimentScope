@@ -6,12 +6,13 @@ import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 
-// Get the API URL from environment variable or fallback to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Get the API URL from environment variable or fallback to production URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
 
 export default function HashtagAnalysis() {
   const [hashtag, setHashtag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<null | {
     sentiment: 'positive' | 'negative' | 'neutral';
     score: number;
@@ -25,28 +26,30 @@ export default function HashtagAnalysis() {
 
   const handleHashtagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setHashtag(e.target.value.replace(/^#/, ''));
+    setError(null); // Clear any previous errors
   };
 
   const handleAnalyze = async () => {
     if (!hashtag.trim()) return;
     
     setLoading(true);
+    setError(null);
     try {
       const cleanHashtag = hashtag.trim().replace(/^#/, '');
+      console.log('Making request to:', `${API_URL}/analyze/hashtag`);
+      
       const response = await fetch(`${API_URL}/analyze/hashtag`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ hashtag: cleanHashtag }),
-        mode: 'cors',
-        credentials: 'omit'
       });
       
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to analyze hashtag: ${errorText}`);
+        throw new Error(errorText || `HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
@@ -59,7 +62,7 @@ export default function HashtagAnalysis() {
     } catch (error: unknown) {
       console.error('Error analyzing hashtag:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to analyze hashtag. Please check if the API is accessible at ${API_URL}\n\nError: ${errorMessage}`);
+      setError(`Failed to analyze hashtag. Please try again later.\n\nError: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -118,6 +121,13 @@ export default function HashtagAnalysis() {
               >
                 {loading ? 'Analyzing...' : 'Analyze Hashtag'}
               </button>
+              
+              {/* Error Message */}
+              {error && (
+                <div className="mt-4 rounded-lg border border-red-500/10 bg-red-500/5 p-4 text-sm text-red-400">
+                  {error}
+                </div>
+              )}
             </div>
           </div>
         </div>
