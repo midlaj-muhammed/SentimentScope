@@ -16,9 +16,6 @@ export default function URLAnalysis() {
     wordFrequency: { word: string; count: number }[];
   }>(null);
 
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value);
-  };
 
   const handleAnalyze = async () => {
     if (!url.trim()) return;

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Input } from '@/components/ui/input';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 
 export default function TextAnalysis() {
@@ -39,12 +38,7 @@ export default function TextAnalysis() {
     }
   };
 
-  const data = result ? [
-    { name: 'Positive', value: result.score },
-    { name: 'Negative', value: 1 - result.score }
-  ] : [];
 
-  const COLORS = ['#4CAF50', '#f44336'];
 
   return (
     <div className="container mx-auto px-4 pt-24">
@@ -165,7 +159,7 @@ export default function TextAnalysis() {
                             height={36}
                             content={({ payload }) => (
                               <div className="flex justify-center gap-4">
-                                {payload.map((entry, index) => (
+                                {payload?.map((entry, index) => (
                                   <div key={`legend-${index}`} className="flex items-center">
                                     <div 
                                       className="mr-2 h-3 w-3 rounded-full" 
