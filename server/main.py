@@ -1,111 +1,39 @@
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
-import re
+from textblob import TextBlob
 from collections import Counter
-import threading
-import time
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from datetime import datetime, timedelta
 import random
 import os
 
-# Global variables for NLTK initialization
-nltk_initialized = False
-nltk_lock = threading.Lock()
-initialization_start_time = None
-MAX_INIT_WAIT_TIME = 60  # Maximum time to wait for initialization in seconds
-
-def download_nltk_data():
-    """Download NLTK data in a separate thread"""
-    global nltk_initialized, initialization_start_time
-    
-    try:
-        # Create all possible NLTK directories
-        nltk_dirs = [
-            '/opt/render/nltk_data',
-            os.path.join(os.getcwd(), 'nltk_data'),
-            os.path.expanduser('~/nltk_data')
-        ]
-        
-        for directory in nltk_dirs:
-            try:
-                os.makedirs(directory, exist_ok=True)
-            except Exception as e:
-                print(f"Failed to create directory {directory}: {e}")
-                continue
-                
-            # Try to download to this directory
-            try:
-                nltk.data.path.append(directory)
-                resources = ['punkt', 'stopwords', 'vader_lexicon']
-                for resource in resources:
-                    try:
-                        nltk.download(resource, download_dir=directory, quiet=True)
-                        print(f"✓ Downloaded {resource} to {directory}")
-                    except Exception as e:
-                        print(f"Failed to download {resource} to {directory}: {e}")
-                        continue
-            except Exception as e:
-                print(f"Failed to use directory {directory}: {e}")
-                continue
-        
-        # Verify resources are available
-        nltk.data.find('tokenizers/punkt')
-        nltk.data.find('corpora/stopwords')
-        nltk.data.find('sentiment/vader_lexicon')
-        
-        with nltk_lock:
-            nltk_initialized = True
-            print("✓ NLTK initialization complete")
-            
-    except Exception as e:
-        print(f"Error during NLTK initialization: {e}")
-    finally:
-        initialization_start_time = None
-
-def initialize_nltk():
-    """Initialize NLTK if not already initialized"""
-    global nltk_initialized, initialization_start_time
-    
-    # If already initialized, return immediately
-    if nltk_initialized:
-        return True
-        
-    with nltk_lock:
-        # Check again under lock
-        if nltk_initialized:
-            return True
-            
-        # If initialization is already in progress
-        if initialization_start_time is not None:
-            elapsed_time = time.time() - initialization_start_time
-            if elapsed_time > MAX_INIT_WAIT_TIME:
-                # Reset if it's been too long
-                initialization_start_time = None
-            else:
-                return False
-                
-        # Start initialization
-        initialization_start_time = time.time()
-        
-    # Start download in background thread
-    thread = threading.Thread(target=download_nltk_data)
-    thread.daemon = True
-    thread.start()
-    return False
-
-# Initialize NLTK on startup
-print('Starting NLTK initialization...')
-initialize_nltk()
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('corpora/stopwords')
+    nltk.data.find('sentiment/vader_lexicon')
+except LookupError:
+    nltk.download('punkt')
+    nltk.download('stopwords')
+    nltk.download('vader_lexicon')
 
 app = Flask(__name__)
 
-# Configure CORS to allow all origins during development
+# Configure CORS to allow specific origins
 CORS(app, resources={
     r"/*": {
-        "origins": "*",
+        "origins": [
+            "http://localhost:3000",
+            "https://sentiment-scope-ten.vercel.app",
+            "https://sentiment-scope.vercel.app",
+            "https://sentimentscope.vercel.app"
+        ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "expose_headers": ["Content-Range", "X-Content-Range"],
@@ -116,34 +44,10 @@ CORS(app, resources={
 
 @app.after_request
 def after_request(response):
-    origin = request.headers.get('Origin')
-    if origin:
-        response.headers['Access-Control-Allow-Origin'] = origin
-    else:
-        response.headers['Access-Control-Allow-Origin'] = '*'
-    
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-    response.headers['Access-Control-Max-Age'] = '3600'
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
     return response
-
-@app.before_request
-def check_nltk_status():
-    """Check NLTK status before handling requests"""
-    # Skip for non-analysis endpoints and OPTIONS requests
-    if request.method == 'OPTIONS' or not any(path in request.path for path in ['/analyze/url', '/analyze/text', '/analyze/hashtag']):
-        return
-        
-    if not nltk_initialized:
-        # Try to initialize if not already done
-        if not initialize_nltk():
-            return jsonify({
-                'error': 'Server is initializing required resources. Please try again in a few moments.',
-                'details': {
-                    'type': 'nltk_initialization_error',
-                    'message': 'NLTK resources are being downloaded'
-                }
-            }), 503
 
 def clean_text(text):
     # Remove HTML tags
@@ -158,9 +62,9 @@ def clean_text(text):
 
 def get_word_frequency(text, top_n=10):
     # Tokenize
-    tokens = nltk.word_tokenize(text)
+    tokens = word_tokenize(text)
     # Remove stopwords
-    stop_words = set(nltk.corpus.stopwords.words('english'))
+    stop_words = set(stopwords.words('english'))
     tokens = [word for word in tokens if word.lower() not in stop_words and len(word) > 2]
     # Get frequency
     word_freq = Counter(tokens).most_common(top_n)
@@ -174,7 +78,7 @@ def analyze_sentiment(text):
     vader_scores = sia.polarity_scores(text)
     
     # Get TextBlob sentiment
-    blob = nltk.TextBlob(text)
+    blob = TextBlob(text)
     textblob_sentiment = blob.sentiment.polarity
     
     # Combine VADER and TextBlob scores with weights
@@ -207,30 +111,18 @@ def analyze_url():
         return '', 200
         
     try:
-        # Log the raw request data
-        print("Request headers:", dict(request.headers))
-        print("Request body:", request.get_data(as_text=True))
-        
+        print("Received request:", request.get_json())
         data = request.get_json()
-        print("Parsed JSON data:", data)
         
         if not data:
-            error_msg = "No JSON data received"
-            print(error_msg)
-            return jsonify({"error": error_msg}), 400
+            print("No JSON data received")
+            return jsonify({"error": "No JSON data received"}), 400
             
         url = data.get('url')
-        print(f"Extracted URL: {url}")
         
         if not url:
-            error_msg = "URL is required"
-            print(error_msg)
-            return jsonify({"error": error_msg}), 400
-        
-        if not isinstance(url, str):
-            error_msg = f"URL must be a string, got {type(url)}"
-            print(error_msg)
-            return jsonify({"error": error_msg}), 400
+            print("URL is required")
+            return jsonify({"error": "URL is required"}), 400
             
         print(f"Analyzing URL: {url}")
             
@@ -283,37 +175,11 @@ def analyze_url():
         return jsonify(result)
         
     except requests.RequestException as e:
-        error_msg = f"Error fetching URL: {str(e)}"
-        print(error_msg)
-        return jsonify({
-            "error": error_msg,
-            "details": {
-                "type": "request_error",
-                "message": str(e)
-            }
-        }), 400
+        print(f"Error fetching URL: {str(e)}")
+        return jsonify({"error": f"Error fetching URL: {str(e)}"}), 400
     except Exception as e:
-        error_msg = str(e)
-        error_type = "analysis_error"
-        status_code = 500
-
-        if "Resource" in error_msg and "not found" in error_msg:
-            error_msg = "Server is initializing NLTK resources. Please try again in a few moments."
-            error_type = "nltk_resource_error"
-            status_code = 503  # Service Temporarily Unavailable
-
-        print(f"Error: {error_msg}")
-        print("Full error:", e)
-        import traceback
-        print("Traceback:", traceback.format_exc())
-
-        return jsonify({
-            "error": error_msg,
-            "details": {
-                "type": error_type,
-                "message": str(e)
-            }
-        }), status_code
+        print(f"Error analyzing content: {str(e)}")
+        return jsonify({"error": f"Error analyzing content: {str(e)}"}), 500
 
 @app.route('/analyze/text', methods=['POST', 'OPTIONS'])
 def analyze_text():

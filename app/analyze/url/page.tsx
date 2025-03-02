@@ -8,81 +8,43 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function URLAnalysis() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    sentiment: string;
+  const [result, setResult] = useState<null | {
+    sentiment: 'positive' | 'negative' | 'neutral';
     score: number;
     confidence: number;
-    wordFrequency: Record<string, number>;
-  } | null>(null);
+    wordFrequency: { word: string; count: number }[];
+  }>(null);
 
   const handleAnalyze = async () => {
-    if (!url) {
-      setError('Please enter a URL');
-      return;
-    }
-
+    if (!url.trim()) return;
+    
     setLoading(true);
-    setError(null);
-    setResult(null);
-
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
-    const maxRetries = 5;  
-    const maxWaitTime = 30000;  
-    const startTime = Date.now();
-    let retryCount = 0;
-    let lastError = null;
-
-    while (retryCount < maxRetries && (Date.now() - startTime) < maxWaitTime) {
-      try {
-        const response = await fetch(`${apiUrl}/analyze/url`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url }),
-        });
-
-        if (response.status === 503) {
-          const data = await response.json();
-          console.log('Server initialization status:', data);
-          
-          // Calculate delay with exponential backoff and jitter
-          const baseDelay = Math.min(1000 * Math.pow(2, retryCount), 10000);
-          const jitter = Math.random() * 1000;
-          const delay = baseDelay + jitter;
-          
-          // Update error message with retry count
-          setError(`Server is initializing (attempt ${retryCount + 1}/${maxRetries}). Retrying in ${Math.round(delay/1000)} seconds...`);
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          retryCount++;
-          continue;
-        }
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setResult(data);
-        setError(null);
-        break;
-      } catch (e) {
-        lastError = e;
-        if (retryCount >= maxRetries - 1 || (Date.now() - startTime) >= maxWaitTime) {
-          break;
-        }
-        retryCount++;
+    try {
+      const response = await fetch('http://localhost:8000/analyze/url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to analyze URL');
       }
+      
+      const data = await response.json();
+      setResult({
+        sentiment: data.sentiment,
+        score: data.score,
+        confidence: data.confidence,
+        wordFrequency: data.wordFrequency
+      });
+    } catch (error) {
+      console.error('Error analyzing URL:', error);
+      alert('Failed to analyze URL. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-    if (lastError || retryCount >= maxRetries || (Date.now() - startTime) >= maxWaitTime) {
-      setError('Server is temporarily unavailable. Please try again in a few moments.');
-      console.error('Analysis failed:', { retryCount, timeElapsed: Date.now() - startTime, lastError });
-    }
-
-    setLoading(false);
   };
 
   return (
@@ -114,11 +76,6 @@ export default function URLAnalysis() {
         <div className="relative mt-12">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-8 backdrop-blur-xl">
             <div className="relative">
-              {error && (
-                <div className="mb-4 rounded-lg border border-red-500/10 bg-red-500/5 p-4 text-sm text-red-400">
-                  {error}
-                </div>
-              )}
               <Input
                 type="url"
                 value={url}
@@ -171,7 +128,7 @@ export default function URLAnalysis() {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={Object.keys(result.wordFrequency).map(key => ({ word: key, count: result.wordFrequency[key] }))}
+                      data={result.wordFrequency}
                       layout="vertical"
                       margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                     >
