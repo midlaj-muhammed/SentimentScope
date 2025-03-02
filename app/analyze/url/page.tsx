@@ -98,9 +98,10 @@ export default function URLAnalysis() {
         confidence: data.confidence,
         wordFrequency: data.wordFrequency
       });
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to analyze URL. Please try again.';
       console.error('Error analyzing URL:', error);
-      setError(error.message || 'Failed to analyze URL. Please try again.');
+      setError(errorMessage);
       setResult(null);
     } finally {
       setLoading(false);
