@@ -55,7 +55,17 @@ export default function HashtagAnalysis() {
     setError(null);
     try {
       const cleanHashtag = hashtag.trim().replace(/^#/, '');
-      console.log('Making request to:', `${API_URL}/analyze/hashtag`);
+      
+      // Debug logging
+      console.log('Environment:', {
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+        API_URL: API_URL
+      });
+      
+      console.log('Request details:', {
+        url: `${API_URL}/analyze/hashtag`,
+        hashtag: cleanHashtag
+      });
       
       const response = await fetch(`${API_URL}/analyze/hashtag`, {
         method: 'POST',
@@ -66,8 +76,16 @@ export default function HashtagAnalysis() {
         body: JSON.stringify({ hashtag: cleanHashtag }),
       });
       
+      // Log response details
+      console.log('Response details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Error response:', errorText);
         throw new Error(errorText || `HTTP error! status: ${response.status}`);
       }
       
@@ -84,7 +102,7 @@ export default function HashtagAnalysis() {
         timeline: data.timeline || []
       });
     } catch (error: unknown) {
-      console.error('Error analyzing hashtag:', error);
+      console.error('Full error details:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to analyze hashtag. Please try again later.\n\nError: ${errorMessage}`);
     } finally {
