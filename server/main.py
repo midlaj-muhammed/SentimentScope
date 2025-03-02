@@ -25,17 +25,10 @@ except LookupError:
 
 app = Flask(__name__)
 
-# Configure CORS to allow specific origins
+# Configure CORS to allow all origins during development
 CORS(app, resources={
     r"/*": {
-        "origins": [
-            "http://localhost:3000",
-            "https://sentiment-scope-ten.vercel.app",
-            "https://sentiment-scope-git-fix-eslint-errors-midlajcalicuts-projects.vercel.app",
-            "https://sentiment-scope.vercel.app",
-            "https://sentimentscope.vercel.app",
-            "https://sentiment-scope-midlajcalicuts-projects.vercel.app"
-        ],
+        "origins": "*",
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "expose_headers": ["Content-Range", "X-Content-Range"],
@@ -46,25 +39,15 @@ CORS(app, resources={
 
 @app.after_request
 def after_request(response):
-    # Get the origin from the request
     origin = request.headers.get('Origin')
-    
-    # List of allowed origins
-    allowed_origins = [
-        'http://localhost:3000',
-        'https://sentiment-scope-ten.vercel.app',
-        'https://sentiment-scope-git-fix-eslint-errors-midlajcalicuts-projects.vercel.app',
-        'https://sentiment-scope.vercel.app',
-        'https://sentimentscope.vercel.app',
-        'https://sentiment-scope-midlajcalicuts-projects.vercel.app'
-    ]
-    
-    # If the origin is in our list of allowed origins, set the CORS header
-    if origin in allowed_origins:
+    if origin:
         response.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        response.headers['Access-Control-Allow-Origin'] = '*'
     
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Max-Age'] = '3600'
     return response
 
 def clean_text(text):
