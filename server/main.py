@@ -13,33 +13,58 @@ from datetime import datetime, timedelta
 import random
 import os
 
-# Download required NLTK data
-def download_nltk_data():
-    try:
-        # Create nltk_data directory if it doesn't exist
-        nltk_data_dir = os.path.join(os.getcwd(), 'nltk_data')
-        os.makedirs(nltk_data_dir, exist_ok=True)
-        nltk.data.path.append(nltk_data_dir)
-        
-        # Download required NLTK data
-        required_packages = ['punkt', 'stopwords', 'vader_lexicon']
-        for package in required_packages:
+# Configure NLTK data directory and download resources
+def setup_nltk():
+    nltk_dirs = [
+        '/opt/render/nltk_data',  # Render's directory
+        os.path.join(os.getcwd(), 'nltk_data'),  # Local directory
+        os.path.expanduser('~/nltk_data')  # User's home directory
+    ]
+    
+    # Add all possible NLTK directories to the search path
+    for directory in nltk_dirs:
+        if directory not in nltk.data.path:
+            nltk.data.path.append(directory)
+    
+    print('NLTK search path:', nltk.data.path)
+    
+    # Define required NLTK resources
+    resources = {
+        'punkt': 'tokenizers/punkt',
+        'stopwords': 'corpora/stopwords',
+        'vader_lexicon': 'sentiment/vader_lexicon'
+    }
+    
+    # Try to find or download each resource
+    for resource, path in resources.items():
+        try:
+            nltk.data.find(path)
+            print(f'✓ Found {resource} at {path}')
+        except LookupError:
+            print(f'Downloading {resource}...')
             try:
-                nltk.data.find(f'tokenizers/{package}' if package == 'punkt' else
-                              f'corpora/{package}' if package == 'stopwords' else
-                              f'sentiment/{package}')
-                print(f'NLTK {package} already downloaded')
-            except LookupError:
-                print(f'Downloading NLTK {package}...')
-                nltk.download(package, download_dir=nltk_data_dir)
-                print(f'Successfully downloaded {package}')
-    except Exception as e:
-        print(f'Error downloading NLTK data: {str(e)}')
-        raise
+                # Try to download to the first available directory
+                for directory in nltk_dirs:
+                    try:
+                        os.makedirs(directory, exist_ok=True)
+                        nltk.download(resource, download_dir=directory, quiet=True)
+                        print(f'✓ Downloaded {resource} to {directory}')
+                        break
+                    except (OSError, IOError) as e:
+                        print(f'Failed to download to {directory}: {e}')
+                        continue
+            except Exception as e:
+                print(f'Error downloading {resource}: {e}')
+                raise
 
-# Download NLTK data on startup
-print('Initializing NLTK data...')
-download_nltk_data()
+# Initialize NLTK on startup
+print('Initializing NLTK...')
+try:
+    setup_nltk()
+    print('NLTK initialization complete!')
+except Exception as e:
+    print(f'NLTK initialization error: {e}')
+    # Log the error but don't prevent server startup
 
 app = Flask(__name__)
 
@@ -157,6 +182,31 @@ def analyze_url():
             
         print(f"Analyzing URL: {url}")
             
+        # Verify NLTK resources before proceeding
+        required_resources = {
+            'punkt': 'tokenizers/punkt',
+            'stopwords': 'corpora/stopwords',
+            'vader_lexicon': 'sentiment/vader_lexicon'
+        }
+        
+        missing_resources = []
+        for resource, path in required_resources.items():
+            try:
+                nltk.data.find(path)
+            except LookupError:
+                missing_resources.append(resource)
+        
+        if missing_resources:
+            error_msg = f"NLTK resources not ready: {', '.join(missing_resources)}"
+            print(error_msg)
+            return jsonify({
+                "error": "Server is initializing required resources. Please try again in a few moments.",
+                "details": {
+                    "type": "nltk_resource_error",
+                    "missing_resources": missing_resources
+                }
+            }), 503
+        
         # Fetch URL content
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
