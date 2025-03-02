@@ -253,51 +253,74 @@ def analyze_hashtag():
             print("Hashtag is required")
             return jsonify({"error": "Hashtag is required"}), 400
             
+        if not re.match(r'^[a-zA-Z0-9_]+$', hashtag):
+            print("Invalid hashtag format")
+            return jsonify({"error": "Invalid hashtag format. Only letters, numbers, and underscores are allowed."}), 400
+            
         print(f"Analyzing hashtag: {hashtag}")
 
-        # Analyze the hashtag text itself
-        hashtag_words = re.findall(r'[A-Z]?[a-z]+|[A-Z]{2,}(?=[A-Z][a-z]|\d|\W|$)|\d+', hashtag)
-        hashtag_text = ' '.join(hashtag_words).lower()
+        # Improved hashtag text analysis
+        # Split camelCase and snake_case into words
+        words = []
+        # Split by underscore first
+        parts = hashtag.split('_')
+        for part in parts:
+            # Then split camelCase
+            words.extend(re.findall(r'[A-Z]?[a-z]+|[A-Z]{2,}(?=[A-Z][a-z]|\d|\W|$)|\d+', part))
         
-        # Get sentiment analysis
+        # Clean and join words
+        hashtag_text = ' '.join(word.lower() for word in words if word)
+        
+        # If no words were extracted, use the original hashtag
+        if not hashtag_text:
+            hashtag_text = hashtag.lower()
+        
+        # Get sentiment analysis with context
         sentiment_analysis = analyze_sentiment(hashtag_text)
         base_sentiment = sentiment_analysis['score']
 
         # Use hashtag as seed for random number generation to ensure consistency
         random.seed(hashtag)
 
-        # Generate timeline data
+        # Generate timeline data with improved volume calculation
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
         timeline = []
         
         # Base parameters - use hash of hashtag for consistency
         hashtag_hash = hash(hashtag)
-        base_volume = 100 + abs(hashtag_hash % 900)
+        base_volume = 50 + abs(hashtag_hash % 450)  # Reduced base volume for more realistic numbers
         trend_direction = 1 if hashtag_hash % 2 == 0 else -1
+        
+        # Peak hours for social media activity (in 24-hour format)
+        peak_hours = {
+            9: 1.2,   # Morning
+            12: 1.3,  # Lunch
+            15: 1.2,  # Afternoon
+            19: 1.5,  # Evening peak
+            21: 1.4,  # Night
+        }
         
         for i in range(24):
             hour = (now - timedelta(hours=23-i)).hour
             time = f"{hour:02d}:00"
             
             # Time-based volume adjustments
-            time_factor = 1.0
-            if 9 <= hour <= 22:
-                time_factor = 1.5
-            elif 23 <= hour or hour <= 4:
-                time_factor = 0.5
+            time_factor = peak_hours.get(hour, 1.0)
+            if 23 <= hour or hour <= 4:
+                time_factor = 0.3  # Reduced activity during night hours
                 
             # Use deterministic values based on hashtag and hour
             hour_seed = f"{hashtag}_{hour}"
             random.seed(hour_seed)
             
-            # Calculate volume
-            volume = int(base_volume * time_factor * (1 + random.uniform(-0.3, 0.3)))
+            # Calculate volume with more natural variation
+            volume = int(base_volume * time_factor * (1 + random.uniform(-0.2, 0.2)))
             
-            # Calculate sentiment
+            # Calculate sentiment with smoother transitions
             time_progress = i / 23
-            trend_component = trend_direction * (time_progress - 0.5) * 0.4
+            trend_component = trend_direction * (time_progress - 0.5) * 0.3
             random.seed(f"{hour_seed}_sentiment")
-            noise = random.uniform(-0.2, 0.2)
+            noise = random.uniform(-0.15, 0.15)
             
             sentiment = max(-1, min(1, base_sentiment + trend_component + noise))
             
@@ -307,23 +330,24 @@ def analyze_hashtag():
                 "volume": volume
             })
             
-        # Calculate overall metrics
+        # Calculate overall metrics with volume-weighted sentiment
         total_volume = sum(t["volume"] for t in timeline)
-        weighted_sentiment = sum(t["sentiment"] * t["volume"] for t in timeline) / total_volume
+        weighted_sentiment = sum(t["sentiment"] * t["volume"] for t in timeline) / total_volume if total_volume > 0 else base_sentiment
         
-        # Determine overall sentiment
-        if weighted_sentiment > 0.1:
+        # Determine overall sentiment with adjusted thresholds
+        if weighted_sentiment > 0.15:
             sentiment = "positive"
-        elif weighted_sentiment < -0.1:
+        elif weighted_sentiment < -0.15:
             sentiment = "negative"
         else:
             sentiment = "neutral"
             
-        # Calculate confidence
+        # Calculate confidence with improved factors
         sentiment_std = (sum((t["sentiment"] - weighted_sentiment) ** 2 for t in timeline) / len(timeline)) ** 0.5
-        volume_factor = min(1.0, total_volume / (1000 * 24))
+        volume_factor = min(1.0, total_volume / (500 * 24))  # Adjusted for lower volumes
         consistency_factor = 1 - sentiment_std
-        confidence = round((volume_factor + consistency_factor) / 2, 3)
+        base_confidence = sentiment_analysis['confidence']
+        confidence = round((volume_factor + consistency_factor + base_confidence) / 3, 3)
             
         result = {
             "sentiment": sentiment,

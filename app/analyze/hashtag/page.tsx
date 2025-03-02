@@ -34,12 +34,22 @@ export default function HashtagAnalysis() {
   }>(null);
 
   const handleHashtagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHashtag(e.target.value.replace(/^#/, ''));
-    setError(null); // Clear any previous errors
+    // Remove any special characters and spaces
+    const cleanedHashtag = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+    setHashtag(cleanedHashtag);
+    setError(null);
   };
 
   const handleAnalyze = async () => {
-    if (!hashtag.trim()) return;
+    if (!hashtag.trim()) {
+      setError('Please enter a hashtag');
+      return;
+    }
+    
+    if (hashtag.length < 2) {
+      setError('Hashtag must be at least 2 characters long');
+      return;
+    }
     
     setLoading(true);
     setError(null);
