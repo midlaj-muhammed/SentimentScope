@@ -18,7 +18,6 @@ function isValidUrl(urlString: string): boolean {
   }
 }
 
-
 export default function URLAnalysis() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,94 +30,62 @@ export default function URLAnalysis() {
   }>(null);
 
   const handleAnalyze = async () => {
-    // Validate URL
-    if (!url.trim()) {
+    if (!url) {
       setError('Please enter a URL');
       return;
     }
 
-    // Validate URL format
-    if (!isValidUrl(url)) {
-      setError('Please enter a valid URL');
-      return;
-    }
-
-    // Debug logging
-    console.log('Request details:', {
-      API_URL,
-      url: url.trim(),
-      endpoint: `${API_URL}/analyze/url`
-    });
-    // Debug logging
-    console.log('Current environment:', {
-      NODE_ENV: process.env.NODE_ENV,
-      API_URL: API_URL
-    });
-    if (!url.trim()) return;
-    
     setLoading(true);
+    setError(null);
+    setResult(null);
+
     try {
-      // Ensure URL has protocol
-      let processedUrl = url;
-      if (!/^https?:\/\//i.test(url)) {
-        processedUrl = 'https://' + url;
-      }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
+      const maxRetries = 3;
+      let retryCount = 0;
+      let lastError = null;
 
-      console.log('Making request to API:', {
-        endpoint: `${API_URL}/analyze/url`,
-        url: processedUrl
-      });
-
-      const response = await fetch(`${API_URL}/analyze/url`, {
-        mode: 'cors',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ url: processedUrl }),
-      });
-      
-      const responseData = await response.text();
-      console.log('Raw response:', responseData);
-      
-      if (!response.ok) {
-        let errorMessage = 'Failed to analyze URL';
-        let shouldRetry = false;
-        
+      while (retryCount < maxRetries) {
         try {
-          const errorData = JSON.parse(responseData);
-          errorMessage = errorData.error || errorMessage;
-          
-          // Check if this is an NLTK initialization error
-          if (errorData.details?.type === 'nltk_resource_error') {
-            shouldRetry = true;
+          const response = await fetch(`${apiUrl}/analyze/url`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url }),
+          });
+
+          if (response.status === 503) {
+            const data = await response.json();
+            console.log('Server initialization error:', data);
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+            retryCount++;
+            continue;
           }
-        } catch {}
-        
-        if (shouldRetry) {
-          // Wait 2 seconds and try again
-          setError('Server is initializing. Retrying in 2 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          handleAnalyze();
-          return;
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          setResult(data);
+          break;
+        } catch (e) {
+          lastError = e;
+          if (retryCount >= maxRetries - 1) break;
+          retryCount++;
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
         }
-        
-        throw new Error(errorMessage);
       }
-      
-      const data = await response.json();
-      setResult({
-        sentiment: data.sentiment,
-        score: data.score,
-        confidence: data.confidence,
-        wordFrequency: data.wordFrequency
-      });
-    } catch (error: Error | unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to analyze URL. Please try again.';
-      console.error('Error analyzing URL:', error);
-      setError(errorMessage);
-      setResult(null);
+
+      if (lastError && retryCount >= maxRetries) {
+        setError('Server is temporarily unavailable. Please try again in a few moments.');
+        console.error('Analysis failed after retries:', lastError);
+      }
+    } catch (error) {
+      setError('Failed to analyze URL. Please try again.');
+      console.error('Analysis error:', error);
     } finally {
       setLoading(false);
     }

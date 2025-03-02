@@ -13,58 +13,43 @@ from datetime import datetime, timedelta
 import random
 import os
 
-# Configure NLTK data directory and download resources
-def setup_nltk():
-    nltk_dirs = [
-        '/opt/render/nltk_data',  # Render's directory
-        os.path.join(os.getcwd(), 'nltk_data'),  # Local directory
-        os.path.expanduser('~/nltk_data')  # User's home directory
-    ]
-    
-    # Add all possible NLTK directories to the search path
-    for directory in nltk_dirs:
-        if directory not in nltk.data.path:
-            nltk.data.path.append(directory)
-    
-    print('NLTK search path:', nltk.data.path)
-    
-    # Define required NLTK resources
-    resources = {
-        'punkt': 'tokenizers/punkt',
-        'stopwords': 'corpora/stopwords',
-        'vader_lexicon': 'sentiment/vader_lexicon'
-    }
-    
-    # Try to find or download each resource
-    for resource, path in resources.items():
-        try:
-            nltk.data.find(path)
-            print(f'✓ Found {resource} at {path}')
-        except LookupError:
-            print(f'Downloading {resource}...')
-            try:
-                # Try to download to the first available directory
-                for directory in nltk_dirs:
-                    try:
-                        os.makedirs(directory, exist_ok=True)
-                        nltk.download(resource, download_dir=directory, quiet=True)
-                        print(f'✓ Downloaded {resource} to {directory}')
-                        break
-                    except (OSError, IOError) as e:
-                        print(f'Failed to download to {directory}: {e}')
-                        continue
-            except Exception as e:
-                print(f'Error downloading {resource}: {e}')
-                raise
+# Global flag to track NLTK initialization status
+nltk_initialized = False
+
+def initialize_nltk():
+    global nltk_initialized
+    if nltk_initialized:
+        return True
+        
+    try:
+        # Add Render's NLTK data directory to the search path
+        nltk_dirs = [
+            '/opt/render/nltk_data',  # Render's directory
+            os.path.join(os.getcwd(), 'nltk_data'),  # Local directory
+            os.path.expanduser('~/nltk_data')  # User's home directory
+        ]
+        
+        # Add all possible NLTK directories to the search path
+        for directory in nltk_dirs:
+            if directory not in nltk.data.path:
+                nltk.data.path.append(directory)
+                print(f'Added NLTK directory: {directory}')
+        
+        # Verify required resources
+        nltk.data.find('tokenizers/punkt')
+        nltk.data.find('corpora/stopwords')
+        nltk.data.find('sentiment/vader_lexicon')
+        
+        nltk_initialized = True
+        print('✓ NLTK initialization complete')
+        return True
+    except Exception as e:
+        print(f'NLTK initialization error: {str(e)}')
+        return False
 
 # Initialize NLTK on startup
 print('Initializing NLTK...')
-try:
-    setup_nltk()
-    print('NLTK initialization complete!')
-except Exception as e:
-    print(f'NLTK initialization error: {e}')
-    # Log the error but don't prevent server startup
+initialize_nltk()
 
 app = Flask(__name__)
 
@@ -92,6 +77,26 @@ def after_request(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     response.headers['Access-Control-Max-Age'] = '3600'
     return response
+
+@app.before_request
+def before_request():
+    # Skip NLTK check for OPTIONS requests (CORS preflight)
+    if request.method == 'OPTIONS':
+        return
+        
+    # Skip NLTK check for non-analysis endpoints
+    if not any(path in request.path for path in ['/analyze/url', '/analyze/text', '/analyze/hashtag']):
+        return
+        
+    if not nltk_initialized:
+        if not initialize_nltk():
+            return jsonify({
+                'error': 'Server is initializing required resources. Please try again in a few moments.',
+                'details': {
+                    'type': 'nltk_initialization_error',
+                    'message': 'NLTK resources are not yet available'
+                }
+            }), 503
 
 def clean_text(text):
     # Remove HTML tags
