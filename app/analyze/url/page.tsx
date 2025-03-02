@@ -1,33 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-
-// Get the API URL from environment variable or fallback to production URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-// URL validation helper
-function isValidUrl(urlString: string): boolean {
-  try {
-    new URL(urlString);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export default function URLAnalysis() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<null | {
-    sentiment: 'positive' | 'negative' | 'neutral';
+  const [result, setResult] = useState<{
+    sentiment: string;
     score: number;
     confidence: number;
-    wordFrequency: { word: string; count: number }[];
-  }>(null);
+    wordFrequency: Record<string, number>;
+  } | null>(null);
 
   const handleAnalyze = async () => {
     if (!url) {
@@ -177,7 +164,7 @@ export default function URLAnalysis() {
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={result.wordFrequency}
+                      data={Object.keys(result.wordFrequency).map(key => ({ word: key, count: result.wordFrequency[key] }))}
                       layout="vertical"
                       margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                     >
