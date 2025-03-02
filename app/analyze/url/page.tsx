@@ -58,7 +58,17 @@ export default function URLAnalysis() {
     
     setLoading(true);
     try {
-      console.log('Making request to:', `${API_URL}/analyze/url`);
+      // Ensure URL has protocol
+      let processedUrl = url;
+      if (!/^https?:\/\//i.test(url)) {
+        processedUrl = 'https://' + url;
+      }
+
+      console.log('Making request to API:', {
+        endpoint: `${API_URL}/analyze/url`,
+        url: processedUrl
+      });
+
       const response = await fetch(`${API_URL}/analyze/url`, {
         mode: 'cors',
         method: 'POST',
@@ -66,11 +76,19 @@ export default function URLAnalysis() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: processedUrl }),
       });
       
+      const responseData = await response.text();
+      console.log('Raw response:', responseData);
+      
       if (!response.ok) {
-        throw new Error('Failed to analyze URL');
+        let errorMessage = 'Failed to analyze URL';
+        try {
+          const errorData = JSON.parse(responseData);
+          errorMessage = errorData.error || errorMessage;
+        } catch {}
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
@@ -80,9 +98,10 @@ export default function URLAnalysis() {
         confidence: data.confidence,
         wordFrequency: data.wordFrequency
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing URL:', error);
-      setError('Failed to analyze URL. Please try again.');
+      setError(error.message || 'Failed to analyze URL. Please try again.');
+      setResult(null);
     } finally {
       setLoading(false);
     }

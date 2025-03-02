@@ -112,18 +112,30 @@ def analyze_url():
         return '', 200
         
     try:
-        print("Received request:", request.get_json())
+        # Log the raw request data
+        print("Request headers:", dict(request.headers))
+        print("Request body:", request.get_data(as_text=True))
+        
         data = request.get_json()
+        print("Parsed JSON data:", data)
         
         if not data:
-            print("No JSON data received")
-            return jsonify({"error": "No JSON data received"}), 400
+            error_msg = "No JSON data received"
+            print(error_msg)
+            return jsonify({"error": error_msg}), 400
             
         url = data.get('url')
+        print(f"Extracted URL: {url}")
         
         if not url:
-            print("URL is required")
-            return jsonify({"error": "URL is required"}), 400
+            error_msg = "URL is required"
+            print(error_msg)
+            return jsonify({"error": error_msg}), 400
+        
+        if not isinstance(url, str):
+            error_msg = f"URL must be a string, got {type(url)}"
+            print(error_msg)
+            return jsonify({"error": error_msg}), 400
             
         print(f"Analyzing URL: {url}")
             
@@ -176,11 +188,28 @@ def analyze_url():
         return jsonify(result)
         
     except requests.RequestException as e:
-        print(f"Error fetching URL: {str(e)}")
-        return jsonify({"error": f"Error fetching URL: {str(e)}"}), 400
+        error_msg = f"Error fetching URL: {str(e)}"
+        print(error_msg)
+        return jsonify({
+            "error": error_msg,
+            "details": {
+                "type": "request_error",
+                "message": str(e)
+            }
+        }), 400
     except Exception as e:
-        print(f"Error analyzing content: {str(e)}")
-        return jsonify({"error": f"Error analyzing content: {str(e)}"}), 500
+        error_msg = f"Error analyzing content: {str(e)}"
+        print(error_msg)
+        print("Full error:", e)
+        import traceback
+        print("Traceback:", traceback.format_exc())
+        return jsonify({
+            "error": error_msg,
+            "details": {
+                "type": "analysis_error",
+                "message": str(e)
+            }
+        }), 500
 
 @app.route('/analyze/text', methods=['POST', 'OPTIONS'])
 def analyze_text():
