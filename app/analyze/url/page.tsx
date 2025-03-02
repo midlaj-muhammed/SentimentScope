@@ -58,10 +58,13 @@ export default function URLAnalysis() {
     
     setLoading(true);
     try {
+      console.log('Making request to:', `${API_URL}/analyze/url`);
       const response = await fetch(`${API_URL}/analyze/url`, {
+        mode: 'cors',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ url }),
       });
