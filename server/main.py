@@ -14,14 +14,32 @@ import random
 import os
 
 # Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('corpora/stopwords')
-    nltk.data.find('sentiment/vader_lexicon')
-except LookupError:
-    nltk.download('punkt')
-    nltk.download('stopwords')
-    nltk.download('vader_lexicon')
+def download_nltk_data():
+    try:
+        # Create nltk_data directory if it doesn't exist
+        nltk_data_dir = os.path.join(os.getcwd(), 'nltk_data')
+        os.makedirs(nltk_data_dir, exist_ok=True)
+        nltk.data.path.append(nltk_data_dir)
+        
+        # Download required NLTK data
+        required_packages = ['punkt', 'stopwords', 'vader_lexicon']
+        for package in required_packages:
+            try:
+                nltk.data.find(f'tokenizers/{package}' if package == 'punkt' else
+                              f'corpora/{package}' if package == 'stopwords' else
+                              f'sentiment/{package}')
+                print(f'NLTK {package} already downloaded')
+            except LookupError:
+                print(f'Downloading NLTK {package}...')
+                nltk.download(package, download_dir=nltk_data_dir)
+                print(f'Successfully downloaded {package}')
+    except Exception as e:
+        print(f'Error downloading NLTK data: {str(e)}')
+        raise
+
+# Download NLTK data on startup
+print('Initializing NLTK data...')
+download_nltk_data()
 
 app = Flask(__name__)
 
@@ -198,18 +216,27 @@ def analyze_url():
             }
         }), 400
     except Exception as e:
-        error_msg = f"Error analyzing content: {str(e)}"
-        print(error_msg)
+        error_msg = str(e)
+        error_type = "analysis_error"
+        status_code = 500
+
+        if "Resource" in error_msg and "not found" in error_msg:
+            error_msg = "Server is initializing NLTK resources. Please try again in a few moments."
+            error_type = "nltk_resource_error"
+            status_code = 503  # Service Temporarily Unavailable
+
+        print(f"Error: {error_msg}")
         print("Full error:", e)
         import traceback
         print("Traceback:", traceback.format_exc())
+
         return jsonify({
             "error": error_msg,
             "details": {
-                "type": "analysis_error",
+                "type": error_type,
                 "message": str(e)
             }
-        }), 500
+        }), status_code
 
 @app.route('/analyze/text', methods=['POST', 'OPTIONS'])
 def analyze_text():

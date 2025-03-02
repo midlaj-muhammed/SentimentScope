@@ -84,10 +84,26 @@ export default function URLAnalysis() {
       
       if (!response.ok) {
         let errorMessage = 'Failed to analyze URL';
+        let shouldRetry = false;
+        
         try {
           const errorData = JSON.parse(responseData);
           errorMessage = errorData.error || errorMessage;
+          
+          // Check if this is an NLTK initialization error
+          if (errorData.details?.type === 'nltk_resource_error') {
+            shouldRetry = true;
+          }
         } catch {}
+        
+        if (shouldRetry) {
+          // Wait 2 seconds and try again
+          setError('Server is initializing. Retrying in 2 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          handleAnalyze();
+          return;
+        }
+        
         throw new Error(errorMessage);
       }
       
