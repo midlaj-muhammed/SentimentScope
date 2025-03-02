@@ -16,6 +16,30 @@ export default function URLAnalysis() {
   }>(null);
 
   const handleAnalyze = async () => {
+    // Validate URL
+    if (!url.trim()) {
+      setError('Please enter a URL');
+      return;
+    }
+
+    try {
+      new URL(url); // This will throw an error if URL is invalid
+    } catch (e) {
+      setError('Please enter a valid URL');
+      return;
+    }
+
+    // Debug logging
+    console.log('Request details:', {
+      API_URL,
+      url: url.trim(),
+      endpoint: `${API_URL}/analyze/url`
+    });
+    // Debug logging
+    console.log('Current environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      API_URL: API_URL
+    });
     if (!url.trim()) return;
     
     setLoading(true);
