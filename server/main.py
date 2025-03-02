@@ -1,54 +1,103 @@
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
-from textblob import TextBlob
-from collections import Counter
 import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-from datetime import datetime, timedelta
+from collections import Counter
+import threading
+import time
 import random
 import os
 
-# Global flag to track NLTK initialization status
+# Global variables for NLTK initialization
 nltk_initialized = False
+nltk_lock = threading.Lock()
+initialization_start_time = None
+MAX_INIT_WAIT_TIME = 60  # Maximum time to wait for initialization in seconds
 
-def initialize_nltk():
-    global nltk_initialized
-    if nltk_initialized:
-        return True
-        
+def download_nltk_data():
+    """Download NLTK data in a separate thread"""
+    global nltk_initialized, initialization_start_time
+    
     try:
-        # Add Render's NLTK data directory to the search path
+        # Create all possible NLTK directories
         nltk_dirs = [
-            '/opt/render/nltk_data',  # Render's directory
-            os.path.join(os.getcwd(), 'nltk_data'),  # Local directory
-            os.path.expanduser('~/nltk_data')  # User's home directory
+            '/opt/render/nltk_data',
+            os.path.join(os.getcwd(), 'nltk_data'),
+            os.path.expanduser('~/nltk_data')
         ]
         
-        # Add all possible NLTK directories to the search path
         for directory in nltk_dirs:
-            if directory not in nltk.data.path:
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except Exception as e:
+                print(f"Failed to create directory {directory}: {e}")
+                continue
+                
+            # Try to download to this directory
+            try:
                 nltk.data.path.append(directory)
-                print(f'Added NLTK directory: {directory}')
+                resources = ['punkt', 'stopwords', 'vader_lexicon']
+                for resource in resources:
+                    try:
+                        nltk.download(resource, download_dir=directory, quiet=True)
+                        print(f"✓ Downloaded {resource} to {directory}")
+                    except Exception as e:
+                        print(f"Failed to download {resource} to {directory}: {e}")
+                        continue
+            except Exception as e:
+                print(f"Failed to use directory {directory}: {e}")
+                continue
         
-        # Verify required resources
+        # Verify resources are available
         nltk.data.find('tokenizers/punkt')
         nltk.data.find('corpora/stopwords')
         nltk.data.find('sentiment/vader_lexicon')
         
-        nltk_initialized = True
-        print('✓ NLTK initialization complete')
-        return True
+        with nltk_lock:
+            nltk_initialized = True
+            print("✓ NLTK initialization complete")
+            
     except Exception as e:
-        print(f'NLTK initialization error: {str(e)}')
-        return False
+        print(f"Error during NLTK initialization: {e}")
+    finally:
+        initialization_start_time = None
+
+def initialize_nltk():
+    """Initialize NLTK if not already initialized"""
+    global nltk_initialized, initialization_start_time
+    
+    # If already initialized, return immediately
+    if nltk_initialized:
+        return True
+        
+    with nltk_lock:
+        # Check again under lock
+        if nltk_initialized:
+            return True
+            
+        # If initialization is already in progress
+        if initialization_start_time is not None:
+            elapsed_time = time.time() - initialization_start_time
+            if elapsed_time > MAX_INIT_WAIT_TIME:
+                # Reset if it's been too long
+                initialization_start_time = None
+            else:
+                return False
+                
+        # Start initialization
+        initialization_start_time = time.time()
+        
+    # Start download in background thread
+    thread = threading.Thread(target=download_nltk_data)
+    thread.daemon = True
+    thread.start()
+    return False
 
 # Initialize NLTK on startup
-print('Initializing NLTK...')
+print('Starting NLTK initialization...')
 initialize_nltk()
 
 app = Flask(__name__)
@@ -79,22 +128,20 @@ def after_request(response):
     return response
 
 @app.before_request
-def before_request():
-    # Skip NLTK check for OPTIONS requests (CORS preflight)
-    if request.method == 'OPTIONS':
-        return
-        
-    # Skip NLTK check for non-analysis endpoints
-    if not any(path in request.path for path in ['/analyze/url', '/analyze/text', '/analyze/hashtag']):
+def check_nltk_status():
+    """Check NLTK status before handling requests"""
+    # Skip for non-analysis endpoints and OPTIONS requests
+    if request.method == 'OPTIONS' or not any(path in request.path for path in ['/analyze/url', '/analyze/text', '/analyze/hashtag']):
         return
         
     if not nltk_initialized:
+        # Try to initialize if not already done
         if not initialize_nltk():
             return jsonify({
                 'error': 'Server is initializing required resources. Please try again in a few moments.',
                 'details': {
                     'type': 'nltk_initialization_error',
-                    'message': 'NLTK resources are not yet available'
+                    'message': 'NLTK resources are being downloaded'
                 }
             }), 503
 
@@ -111,9 +158,9 @@ def clean_text(text):
 
 def get_word_frequency(text, top_n=10):
     # Tokenize
-    tokens = word_tokenize(text)
+    tokens = nltk.word_tokenize(text)
     # Remove stopwords
-    stop_words = set(stopwords.words('english'))
+    stop_words = set(nltk.corpus.stopwords.words('english'))
     tokens = [word for word in tokens if word.lower() not in stop_words and len(word) > 2]
     # Get frequency
     word_freq = Counter(tokens).most_common(top_n)
@@ -127,7 +174,7 @@ def analyze_sentiment(text):
     vader_scores = sia.polarity_scores(text)
     
     # Get TextBlob sentiment
-    blob = TextBlob(text)
+    blob = nltk.TextBlob(text)
     textblob_sentiment = blob.sentiment.polarity
     
     # Combine VADER and TextBlob scores with weights
@@ -187,31 +234,6 @@ def analyze_url():
             
         print(f"Analyzing URL: {url}")
             
-        # Verify NLTK resources before proceeding
-        required_resources = {
-            'punkt': 'tokenizers/punkt',
-            'stopwords': 'corpora/stopwords',
-            'vader_lexicon': 'sentiment/vader_lexicon'
-        }
-        
-        missing_resources = []
-        for resource, path in required_resources.items():
-            try:
-                nltk.data.find(path)
-            except LookupError:
-                missing_resources.append(resource)
-        
-        if missing_resources:
-            error_msg = f"NLTK resources not ready: {', '.join(missing_resources)}"
-            print(error_msg)
-            return jsonify({
-                "error": "Server is initializing required resources. Please try again in a few moments.",
-                "details": {
-                    "type": "nltk_resource_error",
-                    "missing_resources": missing_resources
-                }
-            }), 503
-        
         # Fetch URL content
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, headers=headers, timeout=10)

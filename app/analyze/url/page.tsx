@@ -26,56 +26,63 @@ export default function URLAnalysis() {
     setError(null);
     setResult(null);
 
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
-      const maxRetries = 3;
-      let retryCount = 0;
-      let lastError = null;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
+    const maxRetries = 5;  
+    const maxWaitTime = 30000;  
+    const startTime = Date.now();
+    let retryCount = 0;
+    let lastError = null;
 
-      while (retryCount < maxRetries) {
-        try {
-          const response = await fetch(`${apiUrl}/analyze/url`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ url }),
-          });
+    while (retryCount < maxRetries && (Date.now() - startTime) < maxWaitTime) {
+      try {
+        const response = await fetch(`${apiUrl}/analyze/url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url }),
+        });
 
-          if (response.status === 503) {
-            const data = await response.json();
-            console.log('Server initialization error:', data);
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-            retryCount++;
-            continue;
-          }
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
+        if (response.status === 503) {
           const data = await response.json();
-          setResult(data);
-          break;
-        } catch (e) {
-          lastError = e;
-          if (retryCount >= maxRetries - 1) break;
+          console.log('Server initialization status:', data);
+          
+          // Calculate delay with exponential backoff and jitter
+          const baseDelay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          const jitter = Math.random() * 1000;
+          const delay = baseDelay + jitter;
+          
+          // Update error message with retry count
+          setError(`Server is initializing (attempt ${retryCount + 1}/${maxRetries}). Retrying in ${Math.round(delay/1000)} seconds...`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
           retryCount++;
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          continue;
         }
-      }
 
-      if (lastError && retryCount >= maxRetries) {
-        setError('Server is temporarily unavailable. Please try again in a few moments.');
-        console.error('Analysis failed after retries:', lastError);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setResult(data);
+        setError(null);
+        break;
+      } catch (e) {
+        lastError = e;
+        if (retryCount >= maxRetries - 1 || (Date.now() - startTime) >= maxWaitTime) {
+          break;
+        }
+        retryCount++;
       }
-    } catch (error) {
-      setError('Failed to analyze URL. Please try again.');
-      console.error('Analysis error:', error);
-    } finally {
-      setLoading(false);
     }
+
+    if (lastError || retryCount >= maxRetries || (Date.now() - startTime) >= maxWaitTime) {
+      setError('Server is temporarily unavailable. Please try again in a few moments.');
+      console.error('Analysis failed:', { retryCount, timeElapsed: Date.now() - startTime, lastError });
+    }
+
+    setLoading(false);
   };
 
   return (
