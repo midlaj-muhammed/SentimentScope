@@ -31,8 +31,10 @@ CORS(app, resources={
         "origins": [
             "http://localhost:3000",
             "https://sentiment-scope-ten.vercel.app",
+            "https://sentiment-scope-git-fix-eslint-errors-midlajcalicuts-projects.vercel.app",
             "https://sentiment-scope.vercel.app",
-            "https://sentimentscope.vercel.app"
+            "https://sentimentscope.vercel.app",
+            "https://sentiment-scope-midlajcalicuts-projects.vercel.app"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
@@ -44,9 +46,25 @@ CORS(app, resources={
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    # Get the origin from the request
+    origin = request.headers.get('Origin')
+    
+    # List of allowed origins
+    allowed_origins = [
+        'http://localhost:3000',
+        'https://sentiment-scope-ten.vercel.app',
+        'https://sentiment-scope-git-fix-eslint-errors-midlajcalicuts-projects.vercel.app',
+        'https://sentiment-scope.vercel.app',
+        'https://sentimentscope.vercel.app',
+        'https://sentiment-scope-midlajcalicuts-projects.vercel.app'
+    ]
+    
+    # If the origin is in our list of allowed origins, set the CORS header
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     return response
 
 def clean_text(text):
