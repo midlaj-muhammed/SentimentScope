@@ -1,13 +1,28 @@
 'use client';
 
 import { useState } from 'react';
+
+// Get the API URL from environment variable or fallback to production URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sentimentscope-j7sl.onrender.com';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// URL validation helper
+function isValidUrl(urlString: string): boolean {
+  try {
+    new URL(urlString);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
 export default function URLAnalysis() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<null | {
     sentiment: 'positive' | 'negative' | 'neutral';
     score: number;
@@ -22,9 +37,8 @@ export default function URLAnalysis() {
       return;
     }
 
-    try {
-      new URL(url); // This will throw an error if URL is invalid
-    } catch (e) {
+    // Validate URL format
+    if (!isValidUrl(url)) {
       setError('Please enter a valid URL');
       return;
     }
@@ -44,7 +58,7 @@ export default function URLAnalysis() {
     
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/analyze/url', {
+      const response = await fetch(`${API_URL}/analyze/url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +79,7 @@ export default function URLAnalysis() {
       });
     } catch (error) {
       console.error('Error analyzing URL:', error);
-      alert('Failed to analyze URL. Please try again.');
+      setError('Failed to analyze URL. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -100,6 +114,11 @@ export default function URLAnalysis() {
         <div className="relative mt-12">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-8 backdrop-blur-xl">
             <div className="relative">
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-500/10 bg-red-500/5 p-4 text-sm text-red-400">
+                  {error}
+                </div>
+              )}
               <Input
                 type="url"
                 value={url}
